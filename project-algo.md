@@ -1,3 +1,7 @@
+## project algorithm
+
+
+
 1.  **headPhones**
 
 2. press **START** 
