@@ -1,12 +1,30 @@
-1.  use headphones
-2.  press "start input mic" | this makes the app listen for audio
-    1.  create random target question with random-standard-chord => corresponding scale
-        *   from hierarchy level
-            *   3 of each for each level
-    2.  ​
-3.  <u>**sing and hold**</u> target note for **5** seconds
-4.  when you hit the correct note, a progress bar is starting to fill up
-5.  if ( done within limit ) => { mic => disabled && updateScore( ) && makeNewTarget( ) && cleanProgBar }
-6.  if ( fall out of pitch ) => { cleanProgBar && }
-7.  ​
+1.  **headPhones**
+
+2. press **START** 
+    *   **createQuestion**
+        *   create the target note based on the hierarchy taken from the paper
+            *   [ diatonic triad > diatonic other > non diatonic ]
+                *   d triad [ 1, 3, 5 ]
+                *   d other [ 2, 4, 6, 7 ]
+                *   d other [ b2, b3, b5, b6, b7 ]
+        *   **displayQuestion**
+            *   print the targetNote
+        *   play **contextChord**
+            *   play the chord over which you sing the targetNote
+                *   copy code from *Pitch Machine*
+
+3.  **ENTER targetNote**
+
+    *   progressbar starts
+    *   conditional check
+        *   if ( prev === current) { continue }
+        *   else { cancelProgressbar }
+
+4.  **implement multiple chords**
+
+    *   button that switches **contextChord** and **chordScale**
+        *   create diatonic variables for each chord and scale
+
+    ​
+
 
