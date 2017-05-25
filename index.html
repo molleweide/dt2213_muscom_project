@@ -2,12 +2,18 @@
 <html>
     <head>
         <script src="js/jquery.js"></script>
+        <link rel="stylesheet" type="text/css" href="css/style.css">
     </head>
 
     <body>
-        <button id="buttonStart">Start</button>
-        <button id="buttonReset">Reset</button>
-        <textarea id="not"></textarea>
-        <script src="js/midi.js"></script>
+        <div class="content">
+            <p id="not"></p>
+            <div id="scoreElements"></div>
+            Level: <span id="level"></span><br/>
+            Score: <span id="levelscore"></span><br/>
+            <button id="buttonStart">Start</button>
+            <button id="buttonReset">Reset</button>
+            <script src="js/midi.js"></script>
+        </div>
     </body>
 </html>
