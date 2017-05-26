@@ -5,13 +5,14 @@ var noteInterval = [40,50,59,70,90];
 var currentRootNote = 0;
 var level = 1;
 var levelScore = 0;
-var inputNote = null;
+var CURRENT_INPUT_NOTE = null;
 var reset = false;
 var outputPortId = 1879466032;
 var gateTimerMsec = 3000;
-var notes = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
+var ALL_NOTES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
 var scoreElements = [];
-
+var previousNote = undefined, currentNote = undefined;
+var MAJOR_CHORD_STEPS = { root: 0, third: 4, fifth: 7 };
 // Set scale/intervalsteps
 // todo: add multiple scales and make it possible to the user to change scales
 // Major scale:
@@ -30,23 +31,23 @@ if (navigator.requestMIDIAccess) {
 
 
 
-// TESTING ---------------------------------------------------------
+// List MIDI I/O ---------------------------------------------------------
 
-// function listInputsAndOutputs( midiAccess ) {
-//   for (var entry of midiAccess.inputs) {
-//     var input = entry[1];
-//     console.log( "Input port [type:'" + input.type + "'] id:'" + input.id +
-//       "' manufacturer:'" + input.manufacturer + "' name:'" + input.name +
-//       "' version:'" + input.version + "'" );
-//   }
+function listInputsAndOutputs( midiAccess ) {
+  for (var entry of midiAccess.inputs) {
+    var input = entry[1];
+    console.log( "Input port [type:'" + input.type + "'] id:'" + input.id +
+      "' manufacturer:'" + input.manufacturer + "' name:'" + input.name +
+      "' version:'" + input.version + "'" );
+  }
 
-//   for (var entry of midiAccess.outputs) {
-//     var output = entry[1];
-//     console.log( "Output port [type:'" + output.type + "'] id:'" + output.id +
-//       "' manufacturer:'" + output.manufacturer + "' name:'" + output.name +
-//       "' version:'" + output.version + "'" );
-//   }
-// }
+  for (var entry of midiAccess.outputs) {
+    var output = entry[1];
+    console.log( "Output port [type:'" + output.type + "'] id:'" + output.id +
+      "' manufacturer:'" + output.manufacturer + "' name:'" + output.name +
+      "' version:'" + output.version + "'" );
+  }
+}
 
 
 
@@ -55,6 +56,7 @@ if (navigator.requestMIDIAccess) {
 function onMIDISuccess(midiAccess) {
     
     console.log("Success");
+    
     // // when we get a succesful response, run this code
     midi = midiAccess; // this is our raw MIDI data, inputs, outputs, and sysex status
     // listInputsAndOutputs(midi);
@@ -77,9 +79,8 @@ function onMIDIFailure(error) {
 function onMIDIMessage(message) {
     disableInput();
     data = message.data; // this gives us our [command/channel, note, velocity] data.
-    console.log('MIDI data', data); // MIDI data [144, 63, 73]
-    inputNote = data[1] % 12;
-    console.log("Inputnote: "+inputNote);
+    // console.log('MIDI message data:', data[0],data[1],data[2]); // MIDI data [144, 63, 73]
+    CURRENT_INPUT_NOTE = data[1] % 12; console.log("Sung input note: "+CURRENT_INPUT_NOTE);
     checkInterval();
 }
 
@@ -97,9 +98,13 @@ function sendNote(note, portID) {
 function setOutputBus(midiAccess){
     var outputs = [];
     for (var entry of midiAccess.outputs) {
+        // console.log("entry: "+entry);
         outputs.push(entry);
     }
+    // console.log("outputs:",outputs);
+    // console.log("midiAccess.outputs:",midiAccess.outputs);
     outputPortId = outputs[0][1].id;
+    console.log("outputPortId:",outputPortId)
 }
 
 // ---------------------------------------------------------
@@ -141,9 +146,7 @@ function startNewLevel(callback){
 
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
     currentRootNote = Math.floor((Math.random() * 24) + 48);
-    console.log(currentRootNote%12);
-
-
+    console.log("ROOT NOTE:",currentRootNote%12);
 
     // Calculate and save correct interval/scale
     calculateInterval(); 
@@ -189,7 +192,7 @@ function createScoreElements(){
 // Writes the letter of the note, independent of what octave it is
 function getNoteLetter(midiNote){
     var noteIndex = midiNote % 12;
-    return notes[noteIndex];
+    return ALL_NOTES[noteIndex];
 }
 
 // Returns a major chord array from a rootNote
@@ -197,11 +200,15 @@ function createMajorChord(rootMidiNote){
     return [rootMidiNote, rootMidiNote + 4, rootMidiNote + 7];
 }
 
+function sameNoteChecker(currentNoteSung) {
+    console.log()
+}
 
 function resetGame(){}
 
 
 // Creates and saves the 'correct' notes in an array from the current root note and the set scale
+// ie. create a target interval array
 function calculateInterval(){
     var tempNotes = [];
     var currentStep = 0;
@@ -210,7 +217,7 @@ function calculateInterval(){
         tempNotes.push((currentRootNote + currentStep)%12);
     });
     noteInterval = tempNotes;
-    console.log(noteInterval);
+    console.log("TARGET ARRAY: ",noteInterval);
 }
 
 
@@ -218,12 +225,13 @@ function calculateInterval(){
 function checkInterval(){
 
     // index = -1 if the value is not found
-    var index = noteInterval.indexOf(inputNote);
-    if(index > -1){
-        console.log("Correct!");
+    var index = noteInterval.indexOf(CURRENT_INPUT_NOTE);
 
+    if(index > -1){
+        // if sung note does not exist in the noteInterval array
+        console.log("Correct!");
         levelScore++;
-        if(levelScore < level){
+        if( levelScore < level ){
             noteInterval.splice(index, 1); // Remove from interval
             continueSameLevel(enableInput);
         } else {
@@ -247,7 +255,7 @@ function enableInput(){
         // each time there is a midi message call the onMIDIMessage function
         input.value.onmidimessage = onMIDIMessage;
     }
-    console.log("input enabled");
+    // console.log("input enabled");
 }
 
 
@@ -258,7 +266,7 @@ function disableInput(){
         // each time there is a midi message do nothing
         input.value.onmidimessage = null;
     }
-    console.log("input disabled");
+    // console.log("input disabled");
 }
 
 
