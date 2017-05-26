@@ -16,6 +16,13 @@ body {
     font-weight: bold;
 }
 
+.prog-block {
+	display: inline-block;
+	height: 25px;
+	width: 25px;
+	background: pink;
+}
+
 input[type='checkbox'] {
 	-webkit-appearance: none;
 	background-color: rgba(0,0,0,0);

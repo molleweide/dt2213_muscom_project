@@ -5,14 +5,24 @@ var noteInterval = [40,50,59,70,90];
 var currentRootNote = 0;
 var level = 1;
 var levelScore = 0;
+var PREVIOUS_NOTE = null;
 var CURRENT_INPUT_NOTE = null;
 var reset = false;
 var outputPortId = 1879466032;
+
 var gateTimerMsec = 3000;
 var ALL_NOTES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
 var scoreElements = [];
 var previousNote = undefined, currentNote = undefined;
 var MAJOR_CHORD_STEPS = { root: 0, third: 4, fifth: 7 };
+
+var progressTimerIsRunning = false;
+var progressTimer;
+var stepTimer
+var stepLength = 15;
+var progressTimerDuration = 5 * 1000; // msec
+var progressBarStepTime = progressTimerDuration / stepLength;
+var progressNumber = 1;
 // Set scale/intervalsteps
 // todo: add multiple scales and make it possible to the user to change scales
 // Major scale:
@@ -80,9 +90,64 @@ function onMIDIMessage(message) {
     disableInput();
     data = message.data; // this gives us our [command/channel, note, velocity] data.
     // console.log('MIDI message data:', data[0],data[1],data[2]); // MIDI data [144, 63, 73]
-    CURRENT_INPUT_NOTE = data[1] % 12; console.log("Sung input note: "+CURRENT_INPUT_NOTE);
+    updatePreviousAndCurrentNote( data[1] );
+    evaluateIfPreviousIsEqualToCurrent();
+    if ( !progressTimerIsRunning ) startProgressTimer(); progressTimerIsRunning = true;
     checkInterval();
 }
+
+function updatePreviousAndCurrentNote(midiNote) {
+    PREVIOUS_NOTE = CURRENT_INPUT_NOTE;
+    CURRENT_INPUT_NOTE = midiNote % 12; 
+    console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
+}
+
+function evaluateIfPreviousIsEqualToCurrent() {
+    if ( PREVIOUS_NOTE ) {
+        if ( PREVIOUS_NOTE === CURRENT_INPUT_NOTE ) {
+            console.log( 'same!' );
+        } else {
+            cancelProgressTimer()
+        }
+    }
+}
+function startProgressTimer() {
+    progressTimer = setTimeout(function(){ console.log( "*** same held for 5 sec! ***"); }, progressTimerDuration);
+    fillProgressBar();
+}
+
+function cancelProgressTimer() {
+    clearTimeout(progressTimer);
+    progressTimerIsRunning = false;
+    resetProgressBar();
+    console.log("timeout was cancelled.");
+}
+
+
+function fillProgressBar() {
+    
+    stepTimer = setInterval( function(){ 
+        if ( progressNumber > stepLength ) {
+            resetProgressBar();
+            return;
+        }
+        var progStepIds = "prog-" + progressNumber;
+        var obj = document.getElementById( progStepIds );
+        obj.style.backgroundColor = "green"; progressNumber++;
+    }, progressBarStepTime );
+}
+
+function resetProgressBar() {
+    var progBlocks = document.getElementsByClassName("prog-block");
+    clearInterval( stepTimer );
+    for (var i = 0; i < progBlocks.length; i++) {
+        progBlocks[i].style.backgroundColor="pink";
+    }
+    progressNumber = 1;
+}
+
+
+
 
 function sendNote(note, portID) {
     var noteOnMessage = [0x90, note, 0x7f];    // note on, middle C, full velocity
@@ -105,6 +170,14 @@ function setOutputBus(midiAccess){
     // console.log("midiAccess.outputs:",midiAccess.outputs);
     outputPortId = outputs[0][1].id;
     console.log("outputPortId:",outputPortId)
+}
+
+function makeArrayOfMidiIntoNotes(midiNoteArray) {
+    var arr = midiNoteArray;
+    for(var i=0; i<arr.length; i++){
+        arr[i] = getNoteLetter( arr[i] );
+    }
+    return arr;
 }
 
 // ---------------------------------------------------------
@@ -146,7 +219,7 @@ function startNewLevel(callback){
 
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
     currentRootNote = Math.floor((Math.random() * 24) + 48);
-    console.log("ROOT NOTE:",currentRootNote%12);
+    // console.log("ROOT NOTE:",currentRootNote%12);
 
     // Calculate and save correct interval/scale
     calculateInterval(); 
@@ -170,10 +243,13 @@ function fillScoreElements(){
 }
 
 function updateTextGUI(){
+    // document.getElementById("root-note").innerHTML = getNoteLetter(currentRootNote);
     document.getElementById("level").innerHTML= level;
-    document.getElementById("levelscore").innerHTML = levelScore;
+    document.getElementById("levelscore").innerHTML = levelScore; 
+
     // Update textarea to current note
     document.getElementById("not").innerHTML = getNoteLetter(currentRootNote);
+    document.getElementById("targets-intervals").innerHTML = makeArrayOfMidiIntoNotes( noteInterval ); 
 }
 
 function createScoreElements(){
@@ -200,10 +276,6 @@ function createMajorChord(rootMidiNote){
     return [rootMidiNote, rootMidiNote + 4, rootMidiNote + 7];
 }
 
-function sameNoteChecker(currentNoteSung) {
-    console.log()
-}
-
 function resetGame(){}
 
 
@@ -217,7 +289,7 @@ function calculateInterval(){
         tempNotes.push((currentRootNote + currentStep)%12);
     });
     noteInterval = tempNotes;
-    console.log("TARGET ARRAY: ",noteInterval);
+    console.log("T ARR: ",noteInterval); // array of target intervals
 }
 
 
