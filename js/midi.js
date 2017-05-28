@@ -2,7 +2,7 @@
 // GLOBALS/TEST VARIABLES ---------------------------------------------------------
 var midi, data;
 var noteInterval = [40,50,59,70,90];
-var currentRootNote = 0;
+var currentRootNote = 60;
 var level = 1;
 var levelScore = 0;
 var PREVIOUS_NOTE = null;
@@ -14,7 +14,6 @@ var gateTimerMsec = 3000;
 var ALL_NOTES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
 var scoreElements = [];
 var previousNote = undefined, currentNote = undefined;
-var MAJOR_CHORD_STEPS = { root: 0, third: 4, fifth: 7 };
 
 var progressTimerIsRunning = false;
 var progressTimer;
@@ -71,6 +70,7 @@ function onMIDISuccess(midiAccess) {
     midi = midiAccess; // this is our raw MIDI data, inputs, outputs, and sysex status
 
     // Set first bus to output
+    // listInputsAndOutputs(midi);
     setOutputBus(midi);
 
     // Start game
@@ -96,13 +96,13 @@ function onMIDIMessage(message) {
 function updatePreviousAndCurrentNote(midiNote) {
     PREVIOUS_NOTE = CURRENT_INPUT_NOTE;    
     CURRENT_INPUT_NOTE = midiNote % 12; 
-    console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
+    // console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
 }
 
 function evaluateIfPreviousIsEqualToCurrent() {
     if ( PREVIOUS_NOTE ) {
         if ( PREVIOUS_NOTE === CURRENT_INPUT_NOTE ) {
-            console.log( 'same!' );
+            // console.log( 'same!' );
             return true;
         } else {
             PREVIOUS_NOTE = null;
@@ -153,7 +153,7 @@ function resetProgressBar() {
 
 
 function sendNote(note, portID) {
-    var noteOnMessage = [0x90, note, 0x7f];    // note on, middle C, full velocity
+    var noteOnMessage = [0x90, note, 0x7f];    // note on, note value, full velocity
     var output = midi.outputs.get(portID);
 
     // console.log("output:", output);
@@ -172,7 +172,6 @@ function setOutputBus(midiAccess){
     // console.log("outputs:",outputs);
     // console.log("midiAccess.outputs:",midiAccess.outputs);
     outputPortId = outputs[2][1].id;
-    console.log("outputPortId:",outputPortId)
 }
 
 function makeArrayOfMidiIntoNotes(midiNoteArray) {
@@ -213,27 +212,25 @@ document.getElementById("buttonReset").addEventListener("click", function(){
 
 // Reset internal level score, reset and change gui, start again
 function startNewLevel(callback){
+    console.log("SNL was called");
     levelScore = 0;    
     createScoreElements();
 
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
-    currentRootNote = Math.floor((Math.random() * 24) + 48);
+    
+    // CURRENT ROOT NOTE
+    // currentRootNote = Math.floor((Math.random() * 24) + 48);
+    
     // console.log("ROOT NOTE:",currentRootNote%12);
 
     // TODO:
     // Set gui elements according to level
     updateTextGUI();
 
-<<<<<<< HEAD
-    // Randomize a note [48,72] (C3 to C5, 2 octaves) 
-    // currentRootNote = Math.floor((Math.random() * 24) + 48);
-    
-
-=======
->>>>>>> 5518a45962b39c85f6a0fabbadf86bd757b1570e
     // Calculate and save correct interval/scale
     calculateInterval(); 
-    sendNote(currentRootNote, outputPortId);
+    
+    sendChordMidi(0,4,7); // this is where the chord is sent to pd <<<<------
     setTimeout(callback, gateTimerMsec);
 }
 
@@ -285,8 +282,10 @@ function getNoteLetter(midiNote){
 }
 
 // Returns a major chord array from a rootNote
-function createMajorChord(rootMidiNote){
-    return [rootMidiNote, rootMidiNote + 4, rootMidiNote + 7];
+function sendChordMidi(){
+    for (var i=0; i<arguments.length; i++) {
+        sendNote( currentRootNote + arguments[ i ] , outputPortId );
+    }
 }
 
 function resetGame(){}
@@ -323,7 +322,7 @@ function checkInterval(){
             enableInput();
             
         } else {
-            if(evaluateIfPreviousIsEqualToCurrent()){
+            if( evaluateIfPreviousIsEqualToCurrent() ){
                 if(progressBarFull){
                     console.log("Correct!");
                     cancelProgressTimer();
@@ -354,7 +353,10 @@ function checkInterval(){
     } else {
         console.log("wrong note");
         cancelProgressTimer();
-        startNewLevel(enableInput);
+        // startNewLevel(enableInput); 
+        /* här tolkar jag det som att programmet start om level'n
+            men det ska ju bara göras om man har sjungit korrekt not hela vägen
+        */
         // Code here: Dont go up a level, show a wrong answer, reset note etc.
     }
 }
