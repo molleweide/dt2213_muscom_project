@@ -20,9 +20,10 @@ var progressTimerIsRunning = false;
 var progressTimer;
 var stepTimer
 var stepLength = 15;
-var progressTimerDuration = 5 * 1000; // msec
+var progressTimerDuration = 2 * 1000; // msec
 var progressBarStepTime = progressTimerDuration / stepLength;
 var progressNumber = 1;
+var progressBarFull = false;
 // Set scale/intervalsteps
 // todo: add multiple scales and make it possible to the user to change scales
 // Major scale:
@@ -63,21 +64,16 @@ function listInputsAndOutputs( midiAccess ) {
 
 
 // MIDI FUNCTIONS ---------------------------------------------------------
-function onMIDISuccess(midiAccess) {
-    
+function onMIDISuccess(midiAccess) {  
     console.log("Success");
-    
     // // when we get a succesful response, run this code
+    
     midi = midiAccess; // this is our raw MIDI data, inputs, outputs, and sysex status
-    // listInputsAndOutputs(midi);
-    // var inputs = midi.inputs.values();
-    // // loop over all available inputs and listen for any MIDI input
-    // for (var input = inputs.next(); input && !input.done; input = inputs.next()) {
-    //     // each time there is a midi message call the onMIDIMessage function
-    //     input.value.onmidimessage = onMIDIMessage;
-    // }
 
+    // Set first bus to output
     setOutputBus(midi);
+
+    // Start game
     startNewLevel(enableInput);
 }
 
@@ -90,14 +86,15 @@ function onMIDIMessage(message) {
     disableInput();
     data = message.data; // this gives us our [command/channel, note, velocity] data.
     // console.log('MIDI message data:', data[0],data[1],data[2]); // MIDI data [144, 63, 73]
+    
     updatePreviousAndCurrentNote( data[1] );
-    evaluateIfPreviousIsEqualToCurrent();
-    if ( !progressTimerIsRunning ) startProgressTimer(); progressTimerIsRunning = true;
     checkInterval();
 }
 
+//-----------------------------------------------------------------
+
 function updatePreviousAndCurrentNote(midiNote) {
-    PREVIOUS_NOTE = CURRENT_INPUT_NOTE;
+    PREVIOUS_NOTE = CURRENT_INPUT_NOTE;    
     CURRENT_INPUT_NOTE = midiNote % 12; 
     console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
 }
@@ -106,8 +103,11 @@ function evaluateIfPreviousIsEqualToCurrent() {
     if ( PREVIOUS_NOTE ) {
         if ( PREVIOUS_NOTE === CURRENT_INPUT_NOTE ) {
             console.log( 'same!' );
+            return true;
         } else {
+            PREVIOUS_NOTE = null;
             cancelProgressTimer()
+            return false;
         }
     }
 }
@@ -120,6 +120,7 @@ function cancelProgressTimer() {
     clearTimeout(progressTimer);
     progressTimerIsRunning = false;
     resetProgressBar();
+    PREVIOUS_NOTE = null;
     console.log("timeout was cancelled.");
 }
 
@@ -128,12 +129,13 @@ function fillProgressBar() {
     
     stepTimer = setInterval( function(){ 
         if ( progressNumber > stepLength ) {
-            resetProgressBar();
+            progressBarFull = true;
             return;
         }
         var progStepIds = "prog-" + progressNumber;
         var obj = document.getElementById( progStepIds );
-        obj.style.backgroundColor = "green"; progressNumber++;
+        obj.style.backgroundColor = "green"; 
+        progressNumber++;
     }, progressBarStepTime );
 }
 
@@ -144,6 +146,7 @@ function resetProgressBar() {
         progBlocks[i].style.backgroundColor="pink";
     }
     progressNumber = 1;
+    progressBarFull = false;
 }
 
 
@@ -154,8 +157,8 @@ function sendNote(note, portID) {
     var output = midi.outputs.get(portID);
 
     // console.log("output:", output);
-    output.send( noteOnMessage );
-    output.send( [0x80, note, 0x40], window.performance.now() + 2000.0 );
+    output.send( noteOnMessage ); // Note on
+    output.send( [0x80, note, 0x40], window.performance.now() + 2000.0 ); // Note off
 }
 
 
@@ -210,19 +213,24 @@ document.getElementById("buttonReset").addEventListener("click", function(){
 
 // Reset internal level score, reset and change gui, start again
 function startNewLevel(callback){
-
     levelScore = 0;    
     createScoreElements();
 
+    // Randomize a note [48,72] (C3 to C5, 2 octaves) 
+    currentRootNote = Math.floor((Math.random() * 24) + 48);
+    // console.log("ROOT NOTE:",currentRootNote%12);
 
     // TODO:
     // Set gui elements according to level
     updateTextGUI();
 
+<<<<<<< HEAD
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
     // currentRootNote = Math.floor((Math.random() * 24) + 48);
     
 
+=======
+>>>>>>> 5518a45962b39c85f6a0fabbadf86bd757b1570e
     // Calculate and save correct interval/scale
     calculateInterval(); 
     sendNote(currentRootNote, outputPortId);
@@ -231,6 +239,7 @@ function startNewLevel(callback){
 
 // Keep going without changing level or resetting
 function continueSameLevel(callback){
+    PREVIOUS_NOTE = null;
     updateTextGUI();
     fillScoreElements();
     setTimeout(callback, gateTimerMsec);
@@ -254,6 +263,8 @@ function updateTextGUI(){
     document.getElementById("targets-intervals").innerHTML = makeArrayOfMidiIntoNotes( noteInterval ); 
 }
 
+
+// Create the "level score" gui
 function createScoreElements(){
     scoreElements = [];
     document.getElementById("scoreElements").innerHTML = "";
@@ -264,9 +275,9 @@ function createScoreElements(){
         scoreElements.push(x);
         document.getElementById("scoreElements").appendChild(x);
     }
-
-    
 }
+
+
 // Writes the letter of the note, independent of what octave it is
 function getNoteLetter(midiNote){
     var noteIndex = midiNote % 12;
@@ -295,7 +306,8 @@ function calculateInterval(){
 }
 
 
-// Check if the inputed noted is in the interval array and removes it if found
+// Check if the inputed note is in the interval array and removes it if found
+// and does shit if right or wrong
 function checkInterval(){
 
     // index = -1 if the value is not found
@@ -303,19 +315,45 @@ function checkInterval(){
 
     if(index > -1){
         // if sung note does not exist in the noteInterval array
-        console.log("Correct!");
-        levelScore++;
-        if( levelScore < level ){
-            noteInterval.splice(index, 1); // Remove from interval
-            continueSameLevel(enableInput);
+        // J: tvärtom, if it _does_ exist
+
+        if ( !progressTimerIsRunning ){
+            startProgressTimer(); 
+            progressTimerIsRunning = true;
+            enableInput();
+            
         } else {
-            level++
-            startNewLevel(enableInput);
+            if(evaluateIfPreviousIsEqualToCurrent()){
+                if(progressBarFull){
+                    console.log("Correct!");
+                    cancelProgressTimer();
+                    levelScore++;
+                    if( levelScore < level ){
+                        noteInterval.splice(index, 1); // Remove from interval
+                        continueSameLevel(enableInput);
+                    } else {
+                        level++
+                        startNewLevel(enableInput);
+                    }
+
+                } else {
+                    enableInput();
+                }
+                
+            } else {
+                    cancelProgressTimer();
+                    startNewLevel(enableInput);
+            }
         }
+
+
+
+
         // Code here: depending on level; do again or go up a level 
 
     } else {
         console.log("wrong note");
+        cancelProgressTimer();
         startNewLevel(enableInput);
         // Code here: Dont go up a level, show a wrong answer, reset note etc.
     }
