@@ -168,7 +168,7 @@ function setOutputBus(midiAccess){
     }
     // console.log("outputs:",outputs);
     // console.log("midiAccess.outputs:",midiAccess.outputs);
-    outputPortId = outputs[0][1].id;
+    outputPortId = outputs[2][1].id;
     console.log("outputPortId:",outputPortId)
 }
 
@@ -179,6 +179,8 @@ function makeArrayOfMidiIntoNotes(midiNoteArray) {
     }
     return arr;
 }
+
+
 
 // ---------------------------------------------------------
 
@@ -218,8 +220,8 @@ function startNewLevel(callback){
     updateTextGUI();
 
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
-    currentRootNote = Math.floor((Math.random() * 24) + 48);
-    // console.log("ROOT NOTE:",currentRootNote%12);
+    // currentRootNote = Math.floor((Math.random() * 24) + 48);
+    
 
     // Calculate and save correct interval/scale
     calculateInterval(); 
