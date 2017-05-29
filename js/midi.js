@@ -3,7 +3,7 @@
 var midi, data;
 var noteInterval = [40,50,59,70,90];
 var currentRootNote = 60;
-var level = 1;
+var level = 2;
 var levelScore = 0;
 var PREVIOUS_NOTE = null;
 var CURRENT_INPUT_NOTE = null;
@@ -11,7 +11,7 @@ var reset = false;
 var outputPortId = 1879466032;
 
 var gateTimerMsec = 3000;
-var ALL_NOTES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
+var ALL_NOTES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B","C"];
 var scoreElements = [];
 var previousNote = undefined, currentNote = undefined;
 
@@ -19,10 +19,11 @@ var progressTimerIsRunning = false;
 var progressTimer;
 var stepTimer
 var stepLength = 15;
-var progressTimerDuration = 2 * 1000; // msec
+var progressTimerDuration = 1 * 1000; // msec
 var progressBarStepTime = progressTimerDuration / stepLength;
 var progressNumber = 1;
 var progressBarFull = false;
+var contSingTimeout;
 // Set scale/intervalsteps
 // todo: add multiple scales and make it possible to the user to change scales
 // Major scale:
@@ -74,7 +75,7 @@ function onMIDISuccess(midiAccess) {
     setOutputBus(midi);
 
     // Start game
-    startNewLevel(enableInput);
+    
 }
 
 function onMIDIFailure(error) {
@@ -83,36 +84,55 @@ function onMIDIFailure(error) {
 }
 
 function onMIDIMessage(message) {
+    clearTimeout(contSingTimeout)
     disableInput();
     data = message.data; // this gives us our [command/channel, note, velocity] data.
-    // console.log('MIDI message data:', data[0],data[1],data[2]); // MIDI data [144, 63, 73]
+    console.log('MIDI message data:', data[0],data[1],data[2]); // MIDI data [144, 63, 73]
     
-    updatePreviousAndCurrentNote( data[1] );
-    checkInterval();
+    if(data[0] == 144){
+        updatePreviousAndCurrentNote( data[1] );
+        checkInterval();
+    } else {
+        enableInput();
+    }
+    contSingTimeout = setTimeout(cancelProgressTimer, 500);
+}
+
+function sendNote(note, portID) {
+    var noteOnMessage = [0x90, note, 0x7f];    // note on, note value, full velocity
+    var output = midi.outputs.get(portID);
+
+    // console.log("output:", output);
+    output.send( noteOnMessage ); // Note on
+    //output.send( [0x80, note, 0x40], window.performance.now() + 2000.0 ); // Note off
+}
+
+
+// Sets the output bus to the first one in the system
+function setOutputBus(midiAccess){
+    var outputs = [];
+    for (var entry of midiAccess.outputs) {
+        // console.log("entry: "+entry);
+        outputs.push(entry);
+    }
+    // console.log("outputs:",outputs);
+    // console.log("midiAccess.outputs:",midiAccess.outputs);
+    outputPortId = outputs[0][1].id;
+}
+
+function makeArrayOfMidiIntoNotes(midiNoteArray) {
+    var arr = [];
+    for(var i=0; i<midiNoteArray.length; i++){
+        arr.push(getNoteLetter(midiNoteArray[i])) ;
+    }
+    return arr;
 }
 
 //-----------------------------------------------------------------
 
-function updatePreviousAndCurrentNote(midiNote) {
-    PREVIOUS_NOTE = CURRENT_INPUT_NOTE;    
-    CURRENT_INPUT_NOTE = midiNote % 12; 
-    // console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
-}
 
-function evaluateIfPreviousIsEqualToCurrent() {
-    if ( PREVIOUS_NOTE ) {
-        if ( PREVIOUS_NOTE === CURRENT_INPUT_NOTE ) {
-            // console.log( 'same!' );
-            return true;
-        } else {
-            PREVIOUS_NOTE = null;
-            cancelProgressTimer()
-            return false;
-        }
-    }
-}
 function startProgressTimer() {
-    progressTimer = setTimeout(function(){ console.log( "*** same held for 5 sec! ***"); }, progressTimerDuration);
+    //progressTimer = setTimeout(function(){ console.log( "*** same held for 5 sec! ***"); }, progressTimerDuration);
     fillProgressBar();
 }
 
@@ -121,11 +141,11 @@ function cancelProgressTimer() {
     progressTimerIsRunning = false;
     resetProgressBar();
     PREVIOUS_NOTE = null;
-    console.log("timeout was cancelled.");
 }
 
 
 function fillProgressBar() {
+    
     
     stepTimer = setInterval( function(){ 
         if ( progressNumber > stepLength ) {
@@ -150,40 +170,6 @@ function resetProgressBar() {
 }
 
 
-
-
-function sendNote(note, portID) {
-    var noteOnMessage = [0x90, note, 0x7f];    // note on, note value, full velocity
-    var output = midi.outputs.get(portID);
-
-    // console.log("output:", output);
-    output.send( noteOnMessage ); // Note on
-    output.send( [0x80, note, 0x40], window.performance.now() + 2000.0 ); // Note off
-}
-
-
-// Sets the output bus to the first one in the system
-function setOutputBus(midiAccess){
-    var outputs = [];
-    for (var entry of midiAccess.outputs) {
-        // console.log("entry: "+entry);
-        outputs.push(entry);
-    }
-    // console.log("outputs:",outputs);
-    // console.log("midiAccess.outputs:",midiAccess.outputs);
-    outputPortId = outputs[2][1].id;
-}
-
-function makeArrayOfMidiIntoNotes(midiNoteArray) {
-    var arr = midiNoteArray;
-    for(var i=0; i<arr.length; i++){
-        arr[i] = getNoteLetter( arr[i] );
-    }
-    return arr;
-}
-
-
-
 // ---------------------------------------------------------
 
 
@@ -191,17 +177,33 @@ function makeArrayOfMidiIntoNotes(midiNoteArray) {
 
 // EVENT/BUTTON BINDS ---------------------------------------------------------
 
-document.getElementById("buttonStart").addEventListener("click", function(){
-    console.log("Start game");
-    resetGame()
-    start();
-});
+// document.getElementById("buttonStart").addEventListener("click", function(){
+//     console.log("Start game");
+//     resetGame()
+//     startNewLevel();
+// });
 
-// ONÖDIG
-document.getElementById("buttonReset").addEventListener("click", function(){
-    console.log("Reset game");
-    resetGame();
-});
+$(window).keypress(function (e) {
+    if (e.keyCode === 0 || e.keyCode === 32) {
+        e.preventDefault()
+        //setTimeout(enableInput, gateTimerMsec);
+        if(waitingForSpace){
+            enableInput();
+            waitingForSpace = false;
+        }
+        
+    }
+})
+
+$(window).keypress(function (e) {
+    if (e.keyCode === 13) {
+        e.preventDefault()
+        //setTimeout(enableInput, gateTimerMsec);
+        resetGame();
+        startNewLevel();
+        
+    }
+})
 
 // ---------------------------------------------------------
 
@@ -211,42 +213,63 @@ document.getElementById("buttonReset").addEventListener("click", function(){
 //GAME LOGIC ---------------------------------------------------------
 
 // Reset internal level score, reset and change gui, start again
-function startNewLevel(callback){
-    console.log("SNL was called");
+function startNewLevel(){
     levelScore = 0;    
     createScoreElements();
+    setStatusText("PRESS SPACE TO CAPTURE", "lightblue");
 
     // Randomize a note [48,72] (C3 to C5, 2 octaves) 
     
     // CURRENT ROOT NOTE
-    // currentRootNote = Math.floor((Math.random() * 24) + 48);
+    currentRootNote = Math.floor((Math.random() * 24) + 48);
     
     // console.log("ROOT NOTE:",currentRootNote%12);
+
+    // Calculate and save correct interval/scale
+    calculateInterval(); 
 
     // TODO:
     // Set gui elements according to level
     updateTextGUI();
-
-    // Calculate and save correct interval/scale
-    calculateInterval(); 
-    
     sendChordMidi(0,4,7); // this is where the chord is sent to pd <<<<------
-    setTimeout(callback, gateTimerMsec);
+    waitingForSpace = true;
+
+    
 }
 
 // Keep going without changing level or resetting
 function continueSameLevel(callback){
+    setStatusText("PRESS SPACE TO CAPTURE", "lightblue");
+    CURRENT_INPUT_NOTE = null;
     PREVIOUS_NOTE = null;
     updateTextGUI();
-    fillScoreElements();
-    setTimeout(callback, gateTimerMsec);
+    waitingForSpace = true;
 }
 
 // Fill the checkboxes with the current level score
 function fillScoreElements(){
     for(var i=0; i<levelScore; i++){
-        console.log("fill");
         scoreElements[i].checked = true;
+    }
+}
+
+
+function updatePreviousAndCurrentNote(midiNote) {
+    PREVIOUS_NOTE = CURRENT_INPUT_NOTE;    
+    CURRENT_INPUT_NOTE = (midiNote % 12); 
+    
+    // console.log( "CURRENT_INPUT_NOTE: " + CURRENT_INPUT_NOTE );
+}
+
+function evaluateIfPreviousIsEqualToCurrent() {
+    if ( PREVIOUS_NOTE != null ) {
+        if ( PREVIOUS_NOTE == CURRENT_INPUT_NOTE ) {
+            return true;
+        } else {
+            PREVIOUS_NOTE = null;
+            cancelProgressTimer()
+            return false;
+        }
     }
 }
 
@@ -257,7 +280,7 @@ function updateTextGUI(){
 
     // Update textarea to current note
     document.getElementById("not").innerHTML = getNoteLetter(currentRootNote);
-    document.getElementById("targets-intervals").innerHTML = makeArrayOfMidiIntoNotes( noteInterval ); 
+    document.getElementById("targets-intervals").innerHTML = makeArrayOfMidiIntoNotes(noteInterval) ; 
 }
 
 
@@ -288,7 +311,9 @@ function sendChordMidi(){
     }
 }
 
-function resetGame(){}
+function resetGame(){
+    level = 1;
+}
 
 
 // Creates and saves the 'correct' notes in an array from the current root note and the set scale
@@ -301,7 +326,7 @@ function calculateInterval(){
         tempNotes.push((currentRootNote + currentStep)%12);
     });
     noteInterval = tempNotes;
-    console.log("T ARR: ",noteInterval); // array of target intervals
+    //console.log("T ARR: ",noteInterval); // array of target intervals
 }
 
 
@@ -310,6 +335,7 @@ function calculateInterval(){
 function checkInterval(){
 
     // index = -1 if the value is not found
+    
     var index = noteInterval.indexOf(CURRENT_INPUT_NOTE);
 
     if(index > -1){
@@ -324,15 +350,18 @@ function checkInterval(){
         } else {
             if( evaluateIfPreviousIsEqualToCurrent() ){
                 if(progressBarFull){
-                    console.log("Correct!");
                     cancelProgressTimer();
                     levelScore++;
                     if( levelScore < level ){
+                        setStatusText("CORRECT! The note was " + getNoteLetter(CURRENT_INPUT_NOTE), "green");
                         noteInterval.splice(index, 1); // Remove from interval
-                        continueSameLevel(enableInput);
+                        fillScoreElements();
+                        setTimeout(continueSameLevel, 3000);
                     } else {
+                        setStatusText("CORRECT! The note was " + getNoteLetter(CURRENT_INPUT_NOTE), "green");
                         level++
-                        startNewLevel(enableInput);
+                        fillScoreElements();
+                        setTimeout(startNewLevel, 3000);
                     }
 
                 } else {
@@ -341,7 +370,11 @@ function checkInterval(){
                 
             } else {
                     cancelProgressTimer();
-                    startNewLevel(enableInput);
+                    // setStatusText("WRONG", "red");
+                    CURRENT_INPUT_NOTE = null;
+                    PREVIOUS_NOTE = null;
+                    enableInput();
+                    // setTimeout(continueSameLevel, 3000);
             }
         }
 
@@ -351,9 +384,14 @@ function checkInterval(){
         // Code here: depending on level; do again or go up a level 
 
     } else {
+        CURRENT_INPUT_NOTE = null;
+        PREVIOUS_NOTE = null;
         console.log("wrong note");
         cancelProgressTimer();
-        // startNewLevel(enableInput); 
+        enableInput();
+        
+        // setStatusText("WRONG", "red");
+        // setTimeout(continueSameLevel, 3000); 
         /* här tolkar jag det som att programmet start om level'n
             men det ska ju bara göras om man har sjungit korrekt not hela vägen
         */
@@ -364,6 +402,7 @@ function checkInterval(){
 
 // Start listening to midi messages
 function enableInput(){
+    setStatusText("SING", "green");
     var inputs = midi.inputs.values();
     for (var input = inputs.next(); input && !input.done; input = inputs.next()) {
         // each time there is a midi message call the onMIDIMessage function
@@ -381,6 +420,12 @@ function disableInput(){
         input.value.onmidimessage = null;
     }
     // console.log("input disabled");
+}
+
+function setStatusText(text, color){
+    var a = document.getElementById("status");
+    a.innerHTML = text;
+    a.style.color = color;
 }
 
 

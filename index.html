@@ -7,8 +7,12 @@
 
     <body>
         <div class="content">
+            Level: <span id="level"></span>
+            Score: <span id="levelscore"></span>
             <!-- <p>root note: <span id="root-note"></span> </p> -->
             <p id="not"></p>
+            <p> Target intervals: [ <span id="targets-intervals"></span> ]</p>
+            <p id="status"></p>
             <div class="progress-wrapper">
                 <div class="prog-block" id="prog-1"></div>
                 <div class="prog-block" id="prog-2"></div>
@@ -26,12 +30,8 @@
                 <div class="prog-block" id="prog-14"></div>
                 <div class="prog-block" id="prog-15"></div>
             </div>
-            <p> Target intervals: [ <span id="targets-intervals"></span> ]</p>
+            <br/>
             <div id="scoreElements"></div>
-            Level: <span id="level"></span><br/>
-            Score: <span id="levelscore"></span><br/>
-            <button id="buttonStart">Start</button>
-            <button id="buttonReset">Reset</button>
             <script src="js/midi.js"></script>
         </div>
     </body>
