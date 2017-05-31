@@ -27,7 +27,13 @@ var contSingTimeout;
 // Set scale/intervalsteps
 // todo: add multiple scales and make it possible to the user to change scales
 // Major scale:
-var intervalSteps = [2,2,1,2,2,2];
+var scales = [
+                {suffix: "", chord: [0,4,7], steps: [2,2,1,2,2,2]},
+                {suffix: "m", chord: [0,3,7], steps: [2,1,2,2,1,2]}
+                ];
+var currentScale = scales[1];
+var intervalSteps = currentScale.steps;
+
 
 
 // request MIDI access
@@ -69,11 +75,11 @@ function onMIDISuccess(midiAccess) {
     // // when we get a succesful response, run this code
     
     midi = midiAccess; // this is our raw MIDI data, inputs, outputs, and sysex status
-
+    
     // Set first bus to output
     // listInputsAndOutputs(midi);
     setOutputBus(midi);
-
+    $(window).on("beforeunload",stopChordMidi);
     // Start game
     
 }
@@ -107,6 +113,14 @@ function sendNote(note, portID) {
     //output.send( [0x80, note, 0x40], window.performance.now() + 2000.0 ); // Note off
 }
 
+function stopNote(note, portID){
+    var noteOffMessage = [0x80, note, 0x40];
+    var output = midi.outputs.get(portID);
+    output.send(noteOffMessage); 
+}
+
+
+
 
 // Sets the output bus to the first one in the system
 function setOutputBus(midiAccess){
@@ -122,6 +136,7 @@ function setOutputBus(midiAccess){
 
 function makeArrayOfMidiIntoNotes(midiNoteArray) {
     var arr = [];
+        
     for(var i=0; i<midiNoteArray.length; i++){
         arr.push(getNoteLetter(midiNoteArray[i])) ;
     }
@@ -163,7 +178,7 @@ function resetProgressBar() {
     var progBlocks = document.getElementsByClassName("prog-block");
     clearInterval( stepTimer );
     for (var i = 0; i < progBlocks.length; i++) {
-        progBlocks[i].style.backgroundColor="pink";
+        progBlocks[i].style.backgroundColor="#190319";
     }
     progressNumber = 1;
     progressBarFull = false;
@@ -205,12 +220,15 @@ $(window).keypress(function (e) {
     }
 })
 
+
+
 // ---------------------------------------------------------
 
 
 
-
+//---------------------------------------------------------
 //GAME LOGIC ---------------------------------------------------------
+//---------------------------------------------------------
 
 // Reset internal level score, reset and change gui, start again
 function startNewLevel(){
@@ -222,6 +240,9 @@ function startNewLevel(){
     
     // CURRENT ROOT NOTE
     currentRootNote = Math.floor((Math.random() * 24) + 48);
+    currentScale = scales[Math.floor((Math.random() * 2))];
+    intervalSteps = currentScale.steps;
+
     
     // console.log("ROOT NOTE:",currentRootNote%12);
 
@@ -231,7 +252,7 @@ function startNewLevel(){
     // TODO:
     // Set gui elements according to level
     updateTextGUI();
-    sendChordMidi(0,4,7); // this is where the chord is sent to pd <<<<------
+    sendChordMidi(currentScale.chord); // this is where the chord is sent to pd <<<<------
     waitingForSpace = true;
 
     
@@ -279,7 +300,7 @@ function updateTextGUI(){
     document.getElementById("levelscore").innerHTML = levelScore; 
 
     // Update textarea to current note
-    document.getElementById("not").innerHTML = getNoteLetter(currentRootNote);
+    document.getElementById("not").innerHTML = getNoteLetter(currentRootNote)+currentScale.suffix;
     document.getElementById("targets-intervals").innerHTML = makeArrayOfMidiIntoNotes(noteInterval) ; 
 }
 
@@ -305,9 +326,16 @@ function getNoteLetter(midiNote){
 }
 
 // Returns a major chord array from a rootNote
-function sendChordMidi(){
-    for (var i=0; i<arguments.length; i++) {
-        sendNote( currentRootNote + arguments[ i ] , outputPortId );
+function sendChordMidi(arr){
+    for (var i=0; i<arr.length; i++) {
+        sendNote( currentRootNote + arr[ i ] , outputPortId );
+    }
+}
+
+function stopChordMidi(){
+    var arr = currentScale.chord;
+    for (var i=0; i<arr.length; i++) {
+        stopNote( currentRootNote + arr[ i ] , outputPortId );
     }
 }
 
@@ -381,8 +409,6 @@ function checkInterval(){
 
 
 
-        // Code here: depending on level; do again or go up a level 
-
     } else {
         CURRENT_INPUT_NOTE = null;
         PREVIOUS_NOTE = null;
@@ -395,7 +421,6 @@ function checkInterval(){
         /* här tolkar jag det som att programmet start om level'n
             men det ska ju bara göras om man har sjungit korrekt not hela vägen
         */
-        // Code here: Dont go up a level, show a wrong answer, reset note etc.
     }
 }
 
